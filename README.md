@@ -19,7 +19,7 @@ Arena is a production-minded real-time tournament platform demo. Spectators foll
 
 The target architecture is a pnpm monorepo with Next.js App Router, strict TypeScript, Feature-Sliced Design, TanStack Query, a Fastify modular monolith, typed REST contracts, PostgreSQL/Drizzle, and SSE. Next.js gives public pages strong rendering and metadata primitives. SSE fits Arena's one-way server-to-client live updates; all writes remain explicit, idempotent HTTP mutations.
 
-This first runnable demo deliberately keeps the data simulator in the web app. The production boundary and event protocol are specified in [`docs/architecture.md`](docs/architecture.md); wiring Fastify/PostgreSQL is the next implementation slice, not falsely presented as finished.
+The polished UI demo still runs without infrastructure. A PostgreSQL-backed API foundation is now included for durable snapshots, resumable SSE streams, opaque demo sessions, optimistic concurrency, idempotent writes, and audit records.
 
 ## Architecture at a glance
 
@@ -42,15 +42,24 @@ pnpm dev
 
 Open the local URL printed by the development server. Main routes: `/` and `/organizer`.
 
+To exercise the persisted API, copy `.env.example` to `.env.local`, set `DATABASE_URL`, and apply the migration:
+
+```bash
+psql "$DATABASE_URL" -f server/db/migrations/0001_realtime.sql
+```
+
+The API exposes a demo-session endpoint, tournament snapshots, resumable SSE events, and an idempotent result-publishing mutation. Session tokens are stored only as hashes and sent in an HttpOnly cookie.
+
 ## Quality commands
 
 ```bash
 pnpm lint
-pnpm exec tsc --noEmit
+pnpm typecheck
+pnpm test
 pnpm build
 ```
 
-The target CI matrix adds Vitest domain tests, Fastify/PostgreSQL integration tests, Playwright journeys with axe, and Lighthouse CI. Acceptance criteria are in [`docs/product-spec.md`](docs/product-spec.md).
+CI runs linting, strict type checks, Vitest domain tests, and a production build. PostgreSQL integration tests, Playwright journeys with axe, and Lighthouse CI remain planned. Acceptance criteria are in [`docs/product-spec.md`](docs/product-spec.md).
 
 ## Engineering decisions
 
@@ -66,13 +75,13 @@ Short ADRs are in [`docs/adr`](docs/adr).
 
 ## Demo limitations
 
-- Live events and organizer writes are simulated in memory in this first runnable slice.
-- Refreshing resets changes; no real authentication or PostgreSQL connection is included yet.
+- The current UI remains connected to its in-browser demo state; the persisted endpoints are ready for client integration.
+- Demo sessions are intentionally short-lived and are not a replacement for production identity.
 - One seeded tournament and one competition format keep the demo focused.
 
 ## Roadmap
 
-1. Extract domain and typed contract packages; connect Fastify, PostgreSQL, migrations, and deterministic seeds.
-2. Implement persisted SSE replay, gap detection, idempotency storage, and opaque demo sessions.
-3. Add API integration tests and the four Playwright journeys.
+1. ✅ Ship the public, accessible UI demo and production architecture.
+2. ✅ Add persisted SSE replay, gap detection, idempotency storage, opaque demo sessions, and audit logging.
+3. Connect the UI to the persisted API and add PostgreSQL integration tests plus the four Playwright journeys.
 4. Add catalog, standings, player pages, notifications, and richer organizer analytics after the core slice is stable.
