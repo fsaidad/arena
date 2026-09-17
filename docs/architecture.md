@@ -1,37 +1,69 @@
 # Arena technical design
 
-## Repository target
+## Runtime shape
+
+Arena v1 is a single Next.js App Router service backed by PostgreSQL. The browser, route handlers, SSE stream, and migrations ship from one repository and one deployable artifact.
 
 ```text
-apps/web            Next.js App Router, Feature-Sliced Design
-apps/api            Fastify modular monolith
-packages/contracts  ts-rest + Zod schemas
-packages/domain     pure tournament rules and event reducer
-packages/config     shared TypeScript/lint configuration
+Browser UI
+  ├─ GET  /api/tournaments/:id/snapshot
+  ├─ GET  /api/tournaments/:id/events?after=:sequence
+  ├─ POST /api/demo/session
+  └─ POST /api/tournaments/:id/results
+                    │
+             Next.js route handlers
+                    │
+                PostgreSQL
+       matches · sessions · idempotency
+           event log · audit log
 ```
 
-The current runnable demo is intentionally a single web checkout; this target structure arrives with the real API slice.
+The modular monolith keeps deployment and debugging simple for a focused portfolio slice. API contracts, database access, realtime reduction, and browser features remain separated by module boundaries so they can be extracted later if scale or team ownership justifies it.
 
 ## State ownership
 
-PostgreSQL is authoritative. TanStack Query owns browser server state. Realtime messages patch or invalidate that cache and never create a second domain store. URLSearchParams own filters and navigational tabs. Local React state owns dialogs, menus, drafts, and the connection indicator.
+PostgreSQL is authoritative for tournaments, matches, event sequences, sessions, idempotency records, and audit history. The browser keeps only rendered server state and transient interaction state. Roster add/reset behavior is explicitly a page-local demo interaction.
 
 ## Realtime protocol
 
-`GET /v1/tournaments/:id/snapshot` returns `{ streamId, version, generatedAt, data }`.
+`GET /api/tournaments/:id/snapshot` returns `{ streamId, version, generatedAt, data }`.
 
-`GET /v1/tournaments/:id/events?after=<version>` returns `text/event-stream`. Each envelope contains `eventId`, `streamId`, `sequence`, `schemaVersion`, `aggregateVersion`, `type`, `occurredAt`, `correlationId`, and `payload`.
+`GET /api/tournaments/:id/events?after=<sequence>` returns `text/event-stream`. Each persisted envelope contains an event ID, stream ID, sequence, schema version, aggregate version, timestamp, correlation ID, type, and payload.
 
-Sequence at or below the cursor is a duplicate. The next sequence is applied. Any gap, unknown schema, or expired cursor preserves the last view as stale, fetches a snapshot, then reopens the stream. Reconnect uses exponential backoff with jitter (1, 2, 4, 8, 15 second cap) and resumes immediately when the browser returns online.
+- A sequence at or below the cursor is a duplicate and is ignored.
+- The next expected sequence is applied.
+- A gap or expired cursor preserves the last confirmed view and requests a fresh snapshot.
+- Reconnect uses capped exponential backoff and resumes from the confirmed version.
+- Heartbeats keep an otherwise idle connection observable through proxies.
 
 ## Mutation integrity
 
-Organizer mutations include `Idempotency-Key` and `expectedVersion`. In one transaction the API validates RBAC and version, changes domain rows, increments tournament version, inserts the unique event-log sequence, appends an audit entry, and commits. A repeated key with the same request hash returns the saved response; a different hash or stale version returns `409` and triggers resync.
+Result mutations include an `Idempotency-Key` header and `expectedVersion` body field. One PostgreSQL transaction:
 
-## Security and operations
+1. verifies the session capability;
+2. checks the expected tournament version;
+3. updates the match;
+4. increments the tournament version;
+5. appends the uniquely sequenced event;
+6. records the audit entry and idempotent response.
 
-Demo identities use opaque, hashed session tokens in Secure, HttpOnly, SameSite=Lax cookies. Capabilities and tournament membership are checked server-side for REST and SSE. Requests use schema validation, origin checks, rate/body limits, environment validation, structured problem errors, IDs, and log redaction. V1 runs one long-lived API replica; scale-out starts with PostgreSQL LISTEN/NOTIFY only when justified.
+A repeated key with the same request hash returns the stored response. A reused key with different content or a stale aggregate version returns `409`.
 
-## Verification target
+## Security boundary
 
-Vitest covers bracket rules, permissions, event reduction, backoff, rollback, and idempotency. Fastify integration tests run against PostgreSQL. Playwright covers spectator live updates, demo join, operator changes, and offline/resync across two contexts. Axe and keyboard smoke tests cover public and organizer routes; Lighthouse CI audits built public pages.
+Demo sessions use opaque random tokens. Only token hashes are stored; the browser receives the token in a Secure, HttpOnly, SameSite=Lax cookie. Viewer, operator, and admin capabilities are checked at the mutation boundary. Inputs are validated before database work and public error responses avoid internal details.
+
+This is intentionally demo authentication. Production identity, account recovery, multi-tenant isolation, rate limiting at the edge, and abuse operations are separate product work.
+
+## Delivery and operations
+
+- GitHub Actions runs lint, strict type checks, unit tests, PostgreSQL integration tests, Playwright/axe journeys, Lighthouse budgets, and a production build.
+- Railway waits for a successful commit check suite before deploying.
+- `pnpm db:migrate` runs before a new container starts.
+- `/api/health` performs a database readiness query before promotion.
+- Serverless sleeping is disabled because Arena maintains long-lived SSE connections.
+- The public origin is injected through `NEXT_PUBLIC_SITE_URL` for canonical SEO output.
+
+## Scale path
+
+The current deployment uses one long-lived application replica. The first justified scale step is PostgreSQL `LISTEN/NOTIFY` or a dedicated fan-out adapter so SSE clients connected to different replicas observe the same committed events. Redis, Kafka, microservices, and Kubernetes remain intentionally out of scope until measured load requires them.

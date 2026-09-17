@@ -1,60 +1,101 @@
 # Arena
 
-[GitHub repository](https://github.com/fsaidad/arena)
+**A production-minded real-time tournament platform demo.** Operators publish authoritative match results while spectators stay synchronized through a resumable Server-Sent Events stream.
 
-[Live demo](https://arena-production-0615.up.railway.app)
+[![Quality](https://github.com/fsaidad/arena/actions/workflows/quality.yml/badge.svg)](https://github.com/fsaidad/arena/actions/workflows/quality.yml)
+[![Live demo](https://img.shields.io/badge/live-Railway-dfff3f?style=flat&logo=railway&logoColor=11150f)](https://arena-production-0615.up.railway.app)
+[![Next.js](https://img.shields.io/badge/Next.js-16-11150f?logo=nextdotjs)](https://nextjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169e1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-Arena is a production-minded real-time tournament platform demo. Spectators follow a live match and bracket while an organizer manages participants and publishes results from a focused operations workspace.
+[Open the live demo](https://arena-production-0615.up.railway.app) · [Organizer workspace](https://arena-production-0615.up.railway.app/organizer) · [Technical design](docs/architecture.md)
 
-> Demo product only. No payments, gambling mechanics, or real personal data are used.
+![Arena live tournament landing page](docs/images/arena-live.png)
 
-## What you can try
+## The portfolio proof
 
-- Open the seeded Northern Circuit tournament and watch the score update.
-- Use **Test offline** to preserve stale data, show the degraded state, and reconnect.
-- Enter the demo without registering.
-- Open `/organizer`, switch between Viewer, Operator, and Admin, add a participant, and publish a result.
-- Reset the organizer workspace to its safe seed data.
-- Switch themes; use the entire product with a keyboard.
+Arena demonstrates one complete, failure-aware product loop:
 
-## Why this stack
+1. An operator opens an opaque demo session with a server-enforced role.
+2. A result mutation carries an idempotency key and expected aggregate version.
+3. PostgreSQL commits the match update, event-log entry, and audit record together.
+4. Spectators receive the versioned event over SSE.
+5. A disconnected or stale client keeps the last confirmed state, reconnects, and resynchronizes from a snapshot when needed.
 
-The target architecture is a pnpm monorepo with Next.js App Router, strict TypeScript, Feature-Sliced Design, TanStack Query, a Fastify modular monolith, typed REST contracts, PostgreSQL/Drizzle, and SSE. Next.js gives public pages strong rendering and metadata primitives. SSE fits Arena's one-way server-to-client live updates; all writes remain explicit, idempotent HTTP mutations.
+This is a focused demo, not a static concept page: the public UI, organizer controls, API, event stream, database, migrations, CI, and deployment are connected end to end.
 
-The polished UI demo still runs without infrastructure. A PostgreSQL-backed API foundation is now included for durable snapshots, resumable SSE streams, opaque demo sessions, optimistic concurrency, idempotent writes, and audit records.
+## Product tour
 
-## Architecture at a glance
+| Spectator experience | Organizer workspace |
+| --- | --- |
+| Live score, bracket context, connection freshness, offline simulation, theme switching, and keyboard access. | Viewer/Operator/Admin demo roles, optimistic result publishing, version feedback, persisted state, and a safe local roster sandbox. |
 
-```text
-Browser: Next pages + TanStack Query + EventSource
-               │ same-origin proxy
-Fastify modular monolith: typed REST + RBAC + SSE replay
-               │
-PostgreSQL: snapshots + event log + audit log
+![Arena organizer workspace](docs/images/arena-organizer.png)
+
+<details>
+<summary>Mobile layout</summary>
+
+![Arena mobile landing page](docs/images/arena-mobile.png)
+
+</details>
+
+## Engineering highlights
+
+- **Versioned realtime contract:** ordered envelopes, duplicate rejection, gap detection, snapshot recovery, and exponential reconnect backoff.
+- **Mutation integrity:** optimistic concurrency, request-hash idempotency, and transactional match/event/audit writes.
+- **Server-side authorization:** short-lived demo sessions use opaque tokens stored as hashes and delivered through HttpOnly cookies.
+- **Explicit degraded states:** reconnecting, stale, offline, forbidden, conflict, and service-unavailable behavior are visible and recoverable.
+- **Release safety:** Railway waits for GitHub Actions, runs migrations before startup, and promotes a release only after `/api/health` verifies database readiness.
+- **Quality gates:** lint, strict TypeScript, unit tests, PostgreSQL integration tests, Playwright journeys, axe checks, Lighthouse budgets, and a production build.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser[Next.js + React browser UI]
+  Snapshot[Snapshot API]
+  Mutations[Session and result APIs]
+  Stream[Resumable SSE stream]
+  Database[(PostgreSQL)]
+
+  Browser -->|initial and recovery reads| Snapshot
+  Browser -->|idempotent writes| Mutations
+  Stream -->|versioned events| Browser
+  Snapshot --> Database
+  Mutations --> Database
+  Database --> Stream
 ```
 
-## Local development
+The runnable v1 is deliberately a single Next.js deployment. Route handlers form the server boundary and PostgreSQL is authoritative; this keeps the portfolio slice operationally simple without weakening its concurrency or delivery semantics.
 
-Requirements: Node.js 22+ and pnpm.
+## Stack
+
+- Next.js 16 App Router, React 19, strict TypeScript
+- PostgreSQL 17 with SQL migrations
+- Server-Sent Events and Zod-validated event envelopes
+- Vitest, Node test runner, Playwright, axe-core, Lighthouse CI
+- GitHub Actions and Railway
+
+## Run locally
+
+Requirements: Node.js 22+, pnpm 11+, and Docker.
 
 ```bash
 pnpm install
-pnpm dev
-```
-
-Open the local URL printed by the development server. Main routes: `/` and `/organizer`.
-
-To exercise the persisted API, start the development database, copy `.env.example` to `.env.local`, and apply the migration:
-
-```bash
 docker compose up -d postgres
+cp .env.example .env.local
 pnpm db:migrate
 pnpm dev
 ```
 
-The API exposes a demo-session endpoint, tournament snapshots, resumable SSE events, and an idempotent result-publishing mutation. Session tokens are stored only as hashes and sent in an HttpOnly cookie.
+Open `http://localhost:3000` and `http://localhost:3000/organizer`.
 
-## Quality commands
+On Windows PowerShell, replace the copy command with:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+## Verify
 
 ```bash
 pnpm lint
@@ -66,37 +107,23 @@ pnpm lighthouse
 pnpm build
 ```
 
-CI runs linting, strict type checks, Vitest domain tests, PostgreSQL-backed API integration tests, responsive Playwright journeys with axe, Lighthouse budgets, and a production build. Acceptance criteria are in [`docs/product-spec.md`](docs/product-spec.md).
-
-## Engineering decisions
-
-- The server is authoritative; realtime messages patch or invalidate cached server state.
-- Events carry an ID, stream sequence, schema version, aggregate version, timestamp, and correlation ID.
-- Duplicates are dropped, gaps force snapshot resync, and reconnect uses exponential backoff with jitter.
-- Mutations carry an idempotency key and expected aggregate version.
-- Viewer, operator, and admin capabilities are enforced at the API boundary.
-- URL parameters own public filters; local React state owns ephemeral controls only.
-- Public pages are crawlable; organizer/API routes are `noindex`.
-
-Short ADRs are in [`docs/adr`](docs/adr).
+The same gates run in CI against PostgreSQL. See the [product specification](docs/product-spec.md), [technical design](docs/architecture.md), and short [architecture decisions](docs/adr).
 
 ## Deployment
 
-The live demo runs on Railway with managed PostgreSQL. Railway waits for the GitHub Actions workflow before deploying, applies database migrations as a pre-deploy step, and verifies `/api/health` before promoting a release.
+The live demo runs on Railway with managed PostgreSQL. Production uses:
 
-Set `DATABASE_URL` and `NEXT_PUBLIC_SITE_URL` in the deployment environment. Keep serverless sleeping disabled so SSE connections remain available.
+- `DATABASE_URL` as a private Railway service reference
+- `NEXT_PUBLIC_SITE_URL` for canonical metadata, robots, and sitemap output
+- `pnpm db:migrate` as the pre-deploy command
+- `/api/health` as the deployment health check
+- serverless sleeping disabled to preserve long-lived SSE connections
 
-## Demo limitations
+## Deliberate limits
 
-- Match results are persisted and streamed live; roster add/reset controls remain page-local demo interactions.
-- Demo sessions are intentionally short-lived and are not a replacement for production identity.
-- One seeded tournament and one competition format keep the demo focused.
+- Roster add/reset actions stay page-local; match results are persisted and streamed.
+- Demo sessions are intentionally short-lived and are not production identity.
+- One seeded tournament and one competition format keep the proof focused.
+- No payments, betting, wallets, real identities, or personal data.
 
-## Roadmap
-
-1. ✅ Ship the public, accessible UI demo and production architecture.
-2. ✅ Add persisted SSE replay, gap detection, idempotency storage, opaque demo sessions, and audit logging.
-3. ✅ Connect the live score and organizer controls to the persisted API; verify SSE, RBAC, and idempotency against PostgreSQL.
-4. ✅ Add responsive Playwright journeys, automated accessibility checks, and Lighthouse budgets.
-5. ✅ Deploy the web app and managed PostgreSQL, then publish the live demo URL.
-6. Add catalog, standings, player pages, notifications, and richer organizer analytics after the core slice is stable.
+Arena v1 is feature-complete as a portfolio case study. The next meaningful expansion would be a separate product decision—not unfinished MVP work.
