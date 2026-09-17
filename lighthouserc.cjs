@@ -1,3 +1,10 @@
+const applicationAssertions = {
+  "categories:performance": ["error", { minScore: 0.75 }],
+  "categories:accessibility": ["error", { minScore: 0.9 }],
+  "categories:best-practices": ["error", { minScore: 0.9 }],
+  "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
+};
+
 module.exports = {
   ci: {
     collect: {
@@ -8,13 +15,19 @@ module.exports = {
       },
     },
     assert: {
-      assertions: {
-        "categories:performance": ["error", { minScore: 0.75 }],
-        "categories:accessibility": ["error", { minScore: 0.9 }],
-        "categories:best-practices": ["error", { minScore: 0.9 }],
-        "categories:seo": ["error", { minScore: 0.85 }],
-        "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
-      },
+      assertMatrix: [
+        {
+          matchingUrlPattern: "^https?://[^/]+/$",
+          assertions: {
+            ...applicationAssertions,
+            "categories:seo": ["error", { minScore: 0.85 }],
+          },
+        },
+        {
+          matchingUrlPattern: "^https?://[^/]+/organizer/?$",
+          assertions: applicationAssertions,
+        },
+      ],
     },
     upload: {
       target: "filesystem",
