@@ -46,6 +46,13 @@ async function readUntil(reader, predicate, timeoutMs = 5_000) {
   throw new Error(`SSE stream ended before the expected event. Received: ${text}`);
 }
 
+test("reports database readiness without exposing connection details", async () => {
+  const response = await fetch(`${baseUrl}/api/health`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), { status: "ok" });
+});
+
 test("publishes one durable event and replays an idempotent result", async () => {
   const sessionCookie = await createSession("operator");
   const beforeResponse = await fetch(`${tournamentUrl}/snapshot`);
