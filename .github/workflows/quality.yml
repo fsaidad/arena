@@ -26,12 +26,13 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm db:migrate
       - run: pnpm build
-      - name: Run API integration tests
+      - name: Run browser and API quality gates
         run: |
           pnpm start &
           server_pid=$!
@@ -41,3 +42,5 @@ jobs:
             sleep 1
           done
           pnpm test:integration
+          pnpm test:e2e
+          pnpm lighthouse

@@ -59,10 +59,12 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm test:integration
+pnpm test:e2e
+pnpm lighthouse
 pnpm build
 ```
 
-CI runs linting, strict type checks, Vitest domain tests, PostgreSQL-backed API integration tests, and a production build. Playwright journeys with axe and Lighthouse CI remain planned. Acceptance criteria are in [`docs/product-spec.md`](docs/product-spec.md).
+CI runs linting, strict type checks, Vitest domain tests, PostgreSQL-backed API integration tests, responsive Playwright journeys with axe, Lighthouse budgets, and a production build. Acceptance criteria are in [`docs/product-spec.md`](docs/product-spec.md).
 
 ## Engineering decisions
 
@@ -87,5 +89,6 @@ Short ADRs are in [`docs/adr`](docs/adr).
 1. ✅ Ship the public, accessible UI demo and production architecture.
 2. ✅ Add persisted SSE replay, gap detection, idempotency storage, opaque demo sessions, and audit logging.
 3. ✅ Connect the live score and organizer controls to the persisted API; verify SSE, RBAC, and idempotency against PostgreSQL.
-4. Add the four Playwright journeys, accessibility checks, and a deployed live demo.
-5. Add catalog, standings, player pages, notifications, and richer organizer analytics after the core slice is stable.
+4. ✅ Add responsive Playwright journeys, automated accessibility checks, and Lighthouse budgets.
+5. Deploy the web app and managed PostgreSQL, then publish the live demo URL and screenshots.
+6. Add catalog, standings, player pages, notifications, and richer organizer analytics after the core slice is stable.

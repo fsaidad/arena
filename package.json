@@ -12,8 +12,10 @@
     "start": "next start",
     "lint": "eslint . --ignore-pattern .next",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --exclude tests/integration/**",
+    "test": "vitest run --exclude tests/integration/** --exclude tests/e2e/**",
     "test:integration": "node --test tests/integration/*.test.mjs",
+    "test:e2e": "playwright test",
+    "lighthouse": "lhci autorun",
     "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
@@ -25,6 +27,9 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
