@@ -51,6 +51,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
           return;
         }
 
+        controller.enqueue(encoder.encode(": connected\n\n"));
+
         while (!request.signal.aborted) {
           const events = await readEventsAfter(sql, streamId, nextCursor);
           for (const event of events) {
