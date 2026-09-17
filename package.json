@@ -12,7 +12,9 @@
     "start": "next start",
     "lint": "eslint . --ignore-pattern .next",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --exclude tests/integration/**",
+    "test:integration": "node --test tests/integration/*.test.mjs",
+    "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",
