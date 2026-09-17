@@ -16,6 +16,36 @@ async function createSession(role) {
   return cookie;
 }
 
+async function readUntil(reader, predicate, timeoutMs = 5_000) {
+  const decoder = new TextDecoder();
+  const deadline = Date.now() + timeoutMs;
+  let text = "";
+
+  while (Date.now() < deadline) {
+    const remaining = deadline - Date.now();
+    let timeout;
+    try {
+      const chunk = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error(`Timed out waiting for SSE event. Received: ${text}`)),
+            remaining,
+          );
+        }),
+      ]);
+
+      if (chunk.done) break;
+      text += decoder.decode(chunk.value, { stream: true });
+      if (predicate(text)) return text;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw new Error(`SSE stream ended before the expected event. Received: ${text}`);
+}
+
 test("publishes one durable event and replays an idempotent result", async () => {
   const sessionCookie = await createSession("operator");
   const beforeResponse = await fetch(`${tournamentUrl}/snapshot`);
@@ -57,9 +87,8 @@ test("publishes one durable event and replays an idempotent result", async () =>
   const streamResponse = await fetch(`${tournamentUrl}/events?after=${before.version}`);
   assert.equal(streamResponse.status, 200);
   const reader = streamResponse.body.getReader();
-  const chunk = await reader.read();
+  const eventText = await readUntil(reader, (text) => text.includes("event: match.result_published"));
   await reader.cancel();
-  const eventText = new TextDecoder().decode(chunk.value);
   assert.match(eventText, /event: match\.result_published/);
   assert.match(eventText, new RegExp(`id: ${first.version}`));
 });
