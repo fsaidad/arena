@@ -2,9 +2,11 @@
 
 [GitHub repository](https://github.com/fsaidad/arena)
 
+[Live demo](https://arena-production-0615.up.railway.app)
+
 Arena is a production-minded real-time tournament platform demo. Spectators follow a live match and bracket while an organizer manages participants and publishes results from a focused operations workspace.
 
-> Local demo only. No deployment, external accounts, payments, gambling mechanics, or real personal data are used.
+> Demo product only. No payments, gambling mechanics, or real personal data are used.
 
 ## What you can try
 
@@ -78,9 +80,15 @@ CI runs linting, strict type checks, Vitest domain tests, PostgreSQL-backed API 
 
 Short ADRs are in [`docs/adr`](docs/adr).
 
+## Deployment
+
+The live demo runs on Railway with managed PostgreSQL. Railway waits for the GitHub Actions workflow before deploying, applies database migrations as a pre-deploy step, and verifies `/api/health` before promoting a release.
+
+Set `DATABASE_URL` and `NEXT_PUBLIC_SITE_URL` in the deployment environment. Keep serverless sleeping disabled so SSE connections remain available.
+
 ## Demo limitations
 
-- The current UI remains connected to its in-browser demo state; the persisted endpoints are ready for client integration.
+- Match results are persisted and streamed live; roster add/reset controls remain page-local demo interactions.
 - Demo sessions are intentionally short-lived and are not a replacement for production identity.
 - One seeded tournament and one competition format keep the demo focused.
 
@@ -90,5 +98,5 @@ Short ADRs are in [`docs/adr`](docs/adr).
 2. ✅ Add persisted SSE replay, gap detection, idempotency storage, opaque demo sessions, and audit logging.
 3. ✅ Connect the live score and organizer controls to the persisted API; verify SSE, RBAC, and idempotency against PostgreSQL.
 4. ✅ Add responsive Playwright journeys, automated accessibility checks, and Lighthouse budgets.
-5. Deploy the web app and managed PostgreSQL, then publish the live demo URL and screenshots.
+5. ✅ Deploy the web app and managed PostgreSQL, then publish the live demo URL.
 6. Add catalog, standings, player pages, notifications, and richer organizer analytics after the core slice is stable.

@@ -1,2 +1,14 @@
 import type { MetadataRoute } from "next";
-export default function sitemap(): MetadataRoute.Sitemap { return [{ url: "https://arena.example", lastModified: new Date(), changeFrequency: "weekly", priority: 1 }]; }
+
+import { siteUrl } from "@/shared/config/site";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  return [
+    {
+      url: siteUrl.toString(),
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 1,
+    },
+  ];
+}
