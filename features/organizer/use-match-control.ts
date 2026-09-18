@@ -1,22 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type DemoRole = "viewer" | "operator" | "admin";
 type Mode = "connecting" | "persisted" | "preview";
 
 type SnapshotResponse = {
   version: number;
-  data: { match: { awayScore: number } | null };
+  data: {
+    match: {
+      homeScore: number;
+      awayScore: number;
+      status: "scheduled" | "live" | "completed";
+    } | null;
+  };
 };
 
 const tournamentId = "northern-circuit-2026";
 
 export function useMatchControl(role: DemoRole) {
+  const [homeScore, setHomeScore] = useState(13);
   const [score, setScore] = useState(11);
+  const [matchStatus, setMatchStatus] = useState<"scheduled" | "live" | "completed">("live");
   const [version, setVersion] = useState(42);
   const [mode, setMode] = useState<Mode>("connecting");
+  const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("Connecting to tournament service…");
+  const confirmedScore = useRef(11);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -37,7 +47,12 @@ export function useMatchControl(role: DemoRole) {
         ]);
         if (!snapshotResponse.ok || !sessionResponse.ok) throw new Error("service_unavailable");
         const snapshot = (await snapshotResponse.json()) as SnapshotResponse;
-        if (snapshot.data.match) setScore(snapshot.data.match.awayScore);
+        if (snapshot.data.match) {
+          setHomeScore(snapshot.data.match.homeScore);
+          setScore(snapshot.data.match.awayScore);
+          confirmedScore.current = snapshot.data.match.awayScore;
+          setMatchStatus(snapshot.data.match.status);
+        }
         setVersion(snapshot.version);
         setMode("persisted");
         setNotice("Connected · all changes are persisted");
@@ -53,13 +68,15 @@ export function useMatchControl(role: DemoRole) {
 
   const publishResult = useCallback(
     async (nextScore: number) => {
-      const previousScore = score;
+      const previousScore = confirmedScore.current;
       setScore(nextScore);
       if (mode !== "persisted") {
+        confirmedScore.current = nextScore;
         setNotice("Result updated in preview mode");
         return;
       }
 
+      setSaving(true);
       setNotice("Saving result…");
       try {
         const response = await fetch(`/api/tournaments/${tournamentId}/results`, {
@@ -70,14 +87,16 @@ export function useMatchControl(role: DemoRole) {
           },
           body: JSON.stringify({
             matchId: "upper-final",
-            homeScore: 13,
+            homeScore,
             awayScore: nextScore,
             expectedVersion: version,
           }),
         });
         const body = (await response.json()) as { version?: number; error?: string };
         if (!response.ok || body.version === undefined) throw new Error(body.error ?? "save_failed");
+        confirmedScore.current = nextScore;
         setVersion(body.version);
+        setMatchStatus("completed");
         setNotice("Result saved · live clients updated");
       } catch (error) {
         setScore(previousScore);
@@ -86,10 +105,12 @@ export function useMatchControl(role: DemoRole) {
             ? "Newer result detected · refresh before retrying"
             : "Could not save · previous score restored",
         );
+      } finally {
+        setSaving(false);
       }
     },
-    [mode, score, version],
+    [homeScore, mode, version],
   );
 
-  return { score, setScore, version, mode, notice, setNotice, publishResult };
+  return { homeScore, score, setScore, matchStatus, version, mode, saving, notice, setNotice, publishResult };
 }

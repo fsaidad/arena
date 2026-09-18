@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ChevronRight, Clock3, Moon, Radio, Sun, Trophy, Wifi, WifiOff, X } from "lucide-react";
 
@@ -23,16 +23,56 @@ export default function Home() {
   const [dark, setDark] = useState(false);
   const [joined, setJoined] = useState(false);
   const [round, setRound] = useState(21);
+  const dialogRef = useRef<HTMLElement>(null);
+  const modalOpenerRef = useRef<HTMLElement | null>(null);
   const { state: liveState, disconnect, reconnect } = useLiveTournament();
   const connected = liveState.status === "live";
+  const matchIsLive = liveState.data.status === "live";
   const connectionLabel = liveState.status === "live" ? "Live · synced" : liveState.status === "reconnecting" ? "Reconnecting" : liveState.status === "stale" ? "Stale · retrying" : "Offline · snapshot";
 
   useEffect(() => {
-    const timer = window.setInterval(() => { if (connected) setRound((value) => value + 1); }, 7000);
+    const timer = window.setInterval(() => { if (connected && matchIsLive) setRound((value) => value + 1); }, 7000);
     return () => window.clearInterval(timer);
-  }, [connected]);
+  }, [connected, matchIsLive]);
 
   useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; }, [dark]);
+
+  useEffect(() => {
+    if (!joined) return;
+    modalOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const background = Array.from(document.querySelectorAll<HTMLElement>(".public-shell > :not(.modal-backdrop)"));
+    background.forEach((element) => { element.inert = true; });
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.querySelector<HTMLElement>("button, a[href]")?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setJoined(false);
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), a[href]"));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      background.forEach((element) => { element.inert = false; });
+      document.body.style.overflow = previousOverflow;
+      modalOpenerRef.current?.focus();
+    };
+  }, [joined]);
 
   return (
     <main id="top" className="public-shell">
@@ -53,8 +93,8 @@ export default function Home() {
       <nav className="event-tabs" aria-label="Tournament sections"><a className="active" href="#live">Overview</a><a href="#schedule">Matches</a><a href="#bracket">Bracket</a><button onClick={() => setJoined(true)}>Follow event</button></nav>
 
       <section className="live-stage" id="live" aria-labelledby="live-heading">
-        <div className="live-stage-topline"><div className="live-label"><i /> Live now</div><div className={`sync-state ${connected ? "is-live" : "is-stale"}`}>{connected ? <Wifi size={14} /> : <WifiOff size={14} />}{connectionLabel}</div></div>
-        <div className="match-context"><span>Upper final</span><h2 id="live-heading">Best of 3 <b>·</b> Map 2 — Ancient</h2><span>Round {round}</span></div>
+        <div className="live-stage-topline"><div className={matchIsLive ? "live-label" : "live-label ended"}><i /> {matchIsLive ? "Live now" : liveState.data.status === "completed" ? "Completed" : "Scheduled"}</div><div className={`sync-state ${connected ? "is-live" : "is-stale"}`}>{connected ? <Wifi size={14} /> : <WifiOff size={14} />}{connectionLabel}</div></div>
+        <div className="match-context"><span>Upper final</span><h2 id="live-heading">Best of 3 <b>·</b> Map 2 — Ancient</h2><span>{matchIsLive ? `Round ${round}` : liveState.data.status === "completed" ? "Final" : "Not started"}</span></div>
         <article className="scoreboard" aria-label="Live match score">
           <div className="team-row home-team"><div className="team-identity"><span className="team-monogram kite">BK</span><div><strong>Black Kite</strong><small>Sweden · Seed 04</small></div></div><strong className="score">{liveState.data.homeScore}</strong></div>
           <div className="score-separator"><span>Series</span><b>1 — 0</b></div>
@@ -70,7 +110,7 @@ export default function Home() {
 
       <section className="schedule-section" id="schedule" aria-labelledby="schedule-title">
         <div className="section-title wide"><div><p className="overline">Sep 17 · Day one</p><h2 id="schedule-title">Match schedule</h2></div><span>Times shown in EEST</span></div>
-        <div className="match-list">{matches.map((match, index) => <article className={match.active ? "schedule-row active" : "schedule-row"} key={`${match.home}-${index}`}><time>{match.time}</time><span>{match.stage}</span><strong>{match.home}</strong><i>vs</i><strong>{match.away}</strong><b>{match.score}</b><ChevronRight size={18} /></article>)}</div>
+        <div className="match-list">{matches.map((match, index) => <article className={match.active ? "schedule-row active" : "schedule-row"} key={`${match.home}-${index}`}><time>{match.active ? (matchIsLive ? "Live" : liveState.data.status === "completed" ? "Final" : match.time) : match.time}</time><span>{match.stage}</span><strong>{match.home}</strong><i>vs</i><strong>{match.away}</strong><b>{match.active ? `${liveState.data.homeScore} — ${liveState.data.awayScore}` : match.score}</b><ChevronRight size={18} /></article>)}</div>
       </section>
 
       <section className="bracket-section" id="bracket" aria-labelledby="bracket-title">
@@ -80,7 +120,7 @@ export default function Home() {
 
       <footer className="site-footer"><a className="brand" href="#top"><span className="brand-symbol" aria-hidden="true"><i /><i /></span><span>ARENA</span></a><p>Independent tournament operations demo.<br />No real identities or personal data.</p><a href="https://github.com/fsaidad/arena">View source <ArrowUpRight size={15} /></a></footer>
 
-      {joined && <div className="modal-backdrop" role="presentation" onMouseDown={() => setJoined(false)}><section className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setJoined(false)} aria-label="Close demo dialog"><X size={19} /></button><div className="modal-icon"><Radio size={20} /></div><p className="overline">Event access</p><h2 id="demo-title">Follow Northern Circuit</h2><p>Keep this live match in view or step into the organizer workspace with safe demo data.</p><button className="modal-primary" onClick={() => setJoined(false)}>Continue as spectator</button><Link href="/organizer">Open Arena Control <ArrowUpRight size={15} /></Link></section></div>}
+      {joined && <div className="modal-backdrop" role="presentation" onMouseDown={() => setJoined(false)}><section ref={dialogRef} className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setJoined(false)} aria-label="Close demo dialog"><X size={19} /></button><div className="modal-icon"><Radio size={20} /></div><p className="overline">Event access</p><h2 id="demo-title">Follow Northern Circuit</h2><p>Keep this live match in view or step into the organizer workspace with safe demo data.</p><button className="modal-primary" onClick={() => setJoined(false)}>Continue as spectator</button><Link href="/organizer">Open Arena Control <ArrowUpRight size={15} /></Link></section></div>}
     </main>
   );
 }
