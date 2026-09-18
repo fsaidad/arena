@@ -50,19 +50,6 @@ export async function claimIdempotency(
   return { kind: "replay", status: existing.response_status ?? 200, body: existing.response_body };
 }
 
-export async function completeIdempotency(
-  sql: Database,
-  input: { actorId: string; operation: string; key: string; status: number; body: unknown },
-): Promise<void> {
-  await sql`
-    UPDATE idempotency_keys
-    SET status = 'completed', response_status = ${input.status}, response_body = ${sql.json(input.body as never)}
-    WHERE actor_id = ${input.actorId}
-      AND operation = ${input.operation}
-      AND key = ${input.key}
-  `;
-}
-
 export async function abandonIdempotency(
   sql: Database,
   input: { actorId: string; operation: string; key: string },
