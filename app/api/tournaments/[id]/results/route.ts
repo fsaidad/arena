@@ -8,7 +8,6 @@ import { getDatabase } from "@/server/db/client";
 import {
   abandonIdempotency,
   claimIdempotency,
-  completeIdempotency,
   hashRequest,
 } from "@/server/idempotency/store";
 
@@ -117,16 +116,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
                 ${tx.json({ matchId: match.id })})
       `;
 
-      return { tournamentId, version: nextVersion, correlationId, match: payload };
+      const responseBody = { tournamentId, version: nextVersion, correlationId, match: payload };
+      await tx`
+        UPDATE idempotency_keys
+        SET status = 'completed', response_status = 200, response_body = ${tx.json(responseBody)}
+        WHERE actor_id = ${session.actorId}
+          AND operation = ${operation}
+          AND key = ${idempotencyKey}
+      `;
+
+      return responseBody;
     });
 
-    await completeIdempotency(sql, {
-      actorId: session.actorId,
-      operation,
-      key: idempotencyKey,
-      status: 200,
-      body: responseBody,
-    });
     return NextResponse.json(responseBody);
   } catch (error) {
     await abandonIdempotency(sql, { actorId: session.actorId, operation, key: idempotencyKey });
