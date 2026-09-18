@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ArrowRight, Brackets, ChevronRight, CircleDot, Code2, Moon, Radio, ShieldCheck, Sun, Trophy, Users, WifiOff, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, ChevronRight, Clock3, Moon, Radio, Sun, Trophy, Wifi, WifiOff, X } from "lucide-react";
 
 import { useLiveTournament } from "@/features/live-tournament/use-live-tournament";
 
-const rounds = [
-  { label: "Upper semifinal", time: "18:00", teams: [{ name: "Northstar", seed: "01", score: 12, winner: false }, { name: "Black Kite", seed: "04", score: 13, winner: true }] },
-  { label: "Upper semifinal", time: "20:30", teams: [{ name: "Redline", seed: "02", score: 9, winner: false }, { name: "Morrow", seed: "03", score: 13, winner: true }] },
+const matches = [
+  { stage: "Upper semifinal", time: "Final", home: "Black Kite", away: "Northstar", score: "13 — 11", active: false },
+  { stage: "Upper semifinal", time: "Final", home: "Morrow", away: "Redline", score: "13 — 09", active: false },
+  { stage: "Lower round 2", time: "16:30", home: "Orbit", away: "Fable", score: "—", active: false },
+  { stage: "Upper final", time: "Live", home: "Black Kite", away: "Northstar", score: "13 — 11", active: true },
 ];
 
 const activity = [
-  ["Round 21", "Black Kite secured B site", "just now"],
-  ["Round 20", "Northstar called a tactical timeout", "2m"],
-  ["Round 19", "Fable won a 1v2 clutch", "4m"],
+  ["Round 21", "Black Kite secured B site", "Now"],
+  ["Timeout", "Northstar called a tactical pause", "2 min"],
+  ["Round 19", "Fable converted a 1v2 clutch", "4 min"],
 ];
 
 export default function Home() {
@@ -22,72 +25,62 @@ export default function Home() {
   const [round, setRound] = useState(21);
   const { state: liveState, disconnect, reconnect } = useLiveTournament();
   const connected = liveState.status === "live";
-  const connectionLabel =
-    liveState.status === "live"
-      ? "Live · synced"
-      : liveState.status === "reconnecting"
-        ? "Reconnecting"
-        : liveState.status === "stale"
-          ? "Stale · retrying"
-          : "Offline · snapshot";
+  const connectionLabel = liveState.status === "live" ? "Live · synced" : liveState.status === "reconnecting" ? "Reconnecting" : liveState.status === "stale" ? "Stale · retrying" : "Offline · snapshot";
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (!connected) return;
-      setRound((value) => value + 1);
-    }, 7000);
+    const timer = window.setInterval(() => { if (connected) setRound((value) => value + 1); }, 7000);
     return () => window.clearInterval(timer);
   }, [connected]);
 
   useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; }, [dark]);
-  const jumpToLive = () => document.getElementById("live")?.scrollIntoView({ behavior: "smooth" });
 
   return (
-    <main>
+    <main id="top" className="public-shell">
       <a className="skip-link" href="#live">Skip to live match</a>
-      {!connected && <div className="connection-banner" role="status"><WifiOff size={15} />{liveState.status === "reconnecting" ? "Reconnecting to the live stream…" : "Live connection lost. Showing the last confirmed state."}<button onClick={reconnect}>Reconnect</button></div>}
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="Arena home"><span className="brand-mark"><span /></span>ARENA</a>
-        <nav aria-label="Primary navigation"><a href="#tournaments">Tournaments</a><a href="#live">Live</a><a href="#architecture">Architecture</a></nav>
-        <div className="header-actions"><button className="icon-button" onClick={() => setDark(!dark)} aria-label={`Use ${dark ? "light" : "dark"} theme`}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button><button className="text-button" onClick={() => setJoined(true)}>Enter demo</button></div>
+      {!connected && <div className="connection-banner" role="status"><WifiOff size={15} /><span>{liveState.status === "reconnecting" ? "Reconnecting to the live stream…" : "Live connection lost. Showing the last confirmed state."}</span><button onClick={reconnect}>Reconnect</button></div>}
+
+      <header className="site-header">
+        <a className="brand" href="#top" aria-label="Arena home"><span className="brand-symbol" aria-hidden="true"><i /><i /></span><span>ARENA</span></a>
+        <nav aria-label="Primary navigation"><a className="active" href="#live">Live</a><a href="#schedule">Matches</a><a href="#bracket">Bracket</a></nav>
+        <div className="header-actions"><button className="round-button" onClick={() => setDark(!dark)} aria-label={`Use ${dark ? "light" : "dark"} theme`}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button><Link className="control-link" href="/organizer">Arena Control <ArrowUpRight size={15} /></Link></div>
       </header>
 
-      <section className="hero" id="top">
-        <div className="eyebrow"><Radio size={14} /> LIVE TOURNAMENT OPERATIONS</div>
-        <h1>Every match.<br /><em>One live arena.</em></h1>
-        <p className="hero-copy">Run brackets, publish results, and keep every spectator in sync—from first check-in to the final round.</p>
-        <div className="hero-actions"><button className="primary-cta" onClick={jumpToLive}>Open live tournament <ArrowRight size={18} /></button><a href="#architecture" className="secondary-link">View architecture <ChevronRight size={16} /></a></div>
-        <div className="hero-rail" aria-label="Tournament status summary"><div><strong>24</strong><span>TEAMS CHECKED IN</span></div><div><strong>6</strong><span>MATCHES LIVE</span></div><div><strong>184</strong><span>SPECTATORS ONLINE</span></div><div className="rail-status"><CircleDot size={16} /><span>ALL SYSTEMS<br />SYNCHRONIZED</span></div></div>
+      <section className="event-intro" aria-labelledby="event-title">
+        <div><p className="overline">Northern circuit · Event 04</p><h1 id="event-title">Northern Circuit Invitational</h1></div>
+        <div className="event-facts" aria-label="Event details"><span><b>Sep 17–19</b> Helsinki, Finland</span><span><b>24 teams</b> Double elimination</span></div>
       </section>
 
-      <section className="live-section" id="live" aria-labelledby="live-title">
-        <div className="section-heading"><div><span className="section-index">01 / LIVE</span><h2 id="live-title">Northern Circuit Invitational</h2><p>Counter-Strike 2 · Double elimination · September 17–19</p></div><span className={`sync-state ${connected ? "is-live" : "is-stale"}`}>{connected ? <Activity size={15} /> : <WifiOff size={15} />}{connectionLabel}</span></div>
-        <div className="broadcast-grid">
-          <article className="scoreboard" aria-label="Live match score">
-            <div className="match-meta"><span>UPPER FINAL</span><span>BEST OF 3 · MAP 2</span></div>
-            <div className="team-row"><div className="team-name"><span className="team-glyph kite">BK</span><div><strong>Black Kite</strong><small>Sweden · Seed 04</small></div></div><strong className="score">{liveState.data.homeScore}</strong></div>
-            <div className="score-divider"><span>ANCIENT</span><b>:</b><span>ROUND {round}</span></div>
-            <div className="team-row"><div className="team-name"><span className="team-glyph north">NS</span><div><strong>Northstar</strong><small>Denmark · Seed 01</small></div></div><strong className="score" aria-live="polite">{liveState.data.awayScore}</strong></div>
-            <div className="series"><span className="won">BK 13—8</span><span className="active">Ancient live</span><span>Mirage next</span></div>
-          </article>
-          <aside className="feed" aria-labelledby="feed-title">
-            <div className="feed-title"><span id="feed-title">Match activity</span><button onClick={disconnect} title="Simulate an offline state">Test offline</button></div>
-            <ol>{activity.map(([label, text, time], index) => <li key={label}><i className={index === 0 ? "pulse" : ""} /><div><b>{label}</b><span>{text}</span></div><time>{time}</time></li>)}</ol>
-            <button className="feed-action" onClick={() => setJoined(true)}>Follow this tournament <ArrowRight size={16} /></button>
-          </aside>
-        </div>
+      <nav className="event-tabs" aria-label="Tournament sections"><a className="active" href="#live">Overview</a><a href="#schedule">Matches</a><a href="#bracket">Bracket</a><button onClick={() => setJoined(true)}>Follow event</button></nav>
+
+      <section className="live-stage" id="live" aria-labelledby="live-heading">
+        <div className="live-stage-topline"><div className="live-label"><i /> Live now</div><div className={`sync-state ${connected ? "is-live" : "is-stale"}`}>{connected ? <Wifi size={14} /> : <WifiOff size={14} />}{connectionLabel}</div></div>
+        <div className="match-context"><span>Upper final</span><h2 id="live-heading">Best of 3 <b>·</b> Map 2 — Ancient</h2><span>Round {round}</span></div>
+        <article className="scoreboard" aria-label="Live match score">
+          <div className="team-row home-team"><div className="team-identity"><span className="team-monogram kite">BK</span><div><strong>Black Kite</strong><small>Sweden · Seed 04</small></div></div><strong className="score">{liveState.data.homeScore}</strong></div>
+          <div className="score-separator"><span>Series</span><b>1 — 0</b></div>
+          <div className="team-row away-team"><strong className="score" aria-live="polite">{liveState.data.awayScore}</strong><div className="team-identity"><div><strong>Northstar</strong><small>Denmark · Seed 01</small></div><span className="team-monogram north">NS</span></div></div>
+        </article>
+        <div className="map-score"><span><b>Map 1</b> Dust II <strong>13—8</strong></span><span className="current"><b>Map 2</b> Ancient <strong>{liveState.data.homeScore}—{liveState.data.awayScore}</strong></span><span><b>Map 3</b> Mirage <strong>Next</strong></span></div>
       </section>
 
-      <section className="tournament-section" id="tournaments" aria-labelledby="bracket-title">
-        <div className="section-heading compact"><div><span className="section-index">02 / BRACKET</span><h2 id="bracket-title">The road to the final</h2></div><a href="#live">View full bracket <ArrowRight size={16} /></a></div>
-        <div className="bracket"><div className="round-column"><h3>SEMIFINALS <span>2 MATCHES</span></h3>{rounds.map((match, matchIndex) => <article className="match" key={matchIndex}><div className="match-caption"><span>{match.label}</span><time>{match.time}</time></div>{match.teams.map((team) => <div className={team.winner ? "team winner" : "team"} key={team.name}><span>{team.seed}</span><b>{team.name}</b><strong>{team.score}</strong></div>)}</article>)}</div><div className="bracket-connector" aria-hidden="true"><span /></div><div className="round-column final-column"><h3>GRAND FINAL <span>FRI · 21:00</span></h3><article className="match feature-match"><div className="match-caption"><span>Championship match</span><span>BO5</span></div><div className="team"><span>04</span><b>Black Kite</b><strong>—</strong></div><div className="team"><span>03</span><b>Morrow</b><strong>—</strong></div></article><p><Trophy size={18} /> Winner takes the Northern Circuit title</p></div></div>
+      <section className="live-support" aria-label="Live match information">
+        <div className="match-feed"><div className="section-title"><div><p className="overline">Live desk</p><h2>Match activity</h2></div><button onClick={disconnect}>Test offline</button></div><ol>{activity.map(([label, text, time], index) => <li key={label}><span className={index === 0 ? "feed-dot active" : "feed-dot"} /><b>{label}</b><p>{text}</p><time>{time}</time></li>)}</ol></div>
+        <aside className="up-next"><p className="overline">Up next</p><time><Clock3 size={15} /> 16:30 EEST</time><div><strong>Orbit</strong><span>vs</span><strong>Fable</strong></div><p>Lower bracket · Round 2</p><button onClick={() => setJoined(true)}>Set reminder <ChevronRight size={16} /></button></aside>
       </section>
 
-      <section className="architecture" id="architecture"><div><span className="section-index">03 / UNDER THE HOOD</span><h2>Built to stay correct<br />when the network isn’t.</h2></div><div className="architecture-list"><article><Radio /><div><b>Versioned live events</b><p>Ordered event envelopes, duplicate protection, and gap detection keep every client consistent.</p></div></article><article><ShieldCheck /><div><b>Server-enforced roles</b><p>Viewer, operator, and admin permissions are checked at the API boundary.</p></div></article><article><Brackets /><div><b>Predictable state</b><p>Domain, server, URL, and transient UI state stay separate—and testable.</p></div></article></div></section>
-      <section className="closing"><div><span>NORTHERN CIRCUIT · LIVE NOW</span><h2>Don’t watch the bracket.<br /><em>Feel it move.</em></h2></div><button className="primary-cta inverse" onClick={jumpToLive}>Open live tournament <ArrowRight size={18} /></button></section>
-      <footer><a className="brand" href="#top"><span className="brand-mark"><span /></span> ARENA</a><p>Demo product · No real money, identities, or personal data.</p><a href="https://github.com/fsaidad/arena" aria-label="GitHub repository"><Code2 size={18} /> GitHub</a></footer>
+      <section className="schedule-section" id="schedule" aria-labelledby="schedule-title">
+        <div className="section-title wide"><div><p className="overline">Sep 17 · Day one</p><h2 id="schedule-title">Match schedule</h2></div><span>Times shown in EEST</span></div>
+        <div className="match-list">{matches.map((match, index) => <article className={match.active ? "schedule-row active" : "schedule-row"} key={`${match.home}-${index}`}><time>{match.time}</time><span>{match.stage}</span><strong>{match.home}</strong><i>vs</i><strong>{match.away}</strong><b>{match.score}</b><ChevronRight size={18} /></article>)}</div>
+      </section>
 
-      {joined && <div className="modal-backdrop" role="presentation" onMouseDown={() => setJoined(false)}><section className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setJoined(false)} aria-label="Close demo dialog"><X /></button><span className="team-glyph north"><Users /></span><span className="section-index">DEMO ACCESS</span><h2 id="demo-title">You’re in the arena.</h2><p>Join as spectator to follow the live match, or open the organizer workspace with safe demo data.</p><button className="primary-cta" onClick={() => { setJoined(false); jumpToLive(); }}>Join as spectator <ArrowRight size={18} /></button><a className="organizer-link" href="/organizer">Open organizer workspace</a></section></div>}
+      <section className="bracket-section" id="bracket" aria-labelledby="bracket-title">
+        <div className="section-title wide"><div><p className="overline">Playoffs · Upper bracket</p><h2 id="bracket-title">Path to the final</h2></div><a href="#schedule">All matches <ArrowUpRight size={16} /></a></div>
+        <div className="bracket-board"><div className="bracket-round"><h3>Semifinals <span>Completed</span></h3><article><span><b>04</b> Black Kite <strong>13</strong></span><span><b>01</b> Northstar <strong>11</strong></span></article><article><span><b>03</b> Morrow <strong>13</strong></span><span><b>02</b> Redline <strong>09</strong></span></article></div><div className="bracket-line" aria-hidden="true" /><div className="bracket-round final"><h3>Grand final <span>Fri · 21:00</span></h3><article><span><b>04</b> Black Kite <strong>—</strong></span><span><b>03</b> Morrow <strong>—</strong></span></article><p><Trophy size={16} /> Northern Circuit title</p></div></div>
+      </section>
+
+      <footer className="site-footer"><a className="brand" href="#top"><span className="brand-symbol" aria-hidden="true"><i /><i /></span><span>ARENA</span></a><p>Independent tournament operations demo.<br />No real identities or personal data.</p><a href="https://github.com/fsaidad/arena">View source <ArrowUpRight size={15} /></a></footer>
+
+      {joined && <div className="modal-backdrop" role="presentation" onMouseDown={() => setJoined(false)}><section className="demo-modal" role="dialog" aria-modal="true" aria-labelledby="demo-title" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setJoined(false)} aria-label="Close demo dialog"><X size={19} /></button><div className="modal-icon"><Radio size={20} /></div><p className="overline">Event access</p><h2 id="demo-title">Follow Northern Circuit</h2><p>Keep this live match in view or step into the organizer workspace with safe demo data.</p><button className="modal-primary" onClick={() => setJoined(false)}>Continue as spectator</button><Link href="/organizer">Open Arena Control <ArrowUpRight size={15} /></Link></section></div>}
     </main>
   );
 }
