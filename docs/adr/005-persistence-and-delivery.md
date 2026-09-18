@@ -2,4 +2,4 @@
 
 **Status:** Accepted
 
-Use PostgreSQL with stable Drizzle migrations. Run web on a Next-capable host and SSE/API on a long-lived Node container behind a same-origin proxy. Docker is limited to local PostgreSQL and production-like API runs. Do not add Redis, queues, or orchestration before multi-instance fan-out is required.
+Use PostgreSQL with versioned, repeatable SQL migrations executed by the repository migration script. Run web and SSE/API together in a long-lived Next.js Node container. Docker Compose is limited to local PostgreSQL. Do not add Redis, queues, or orchestration before multi-instance fan-out is required.
